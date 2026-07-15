@@ -4,7 +4,7 @@ Official implementation of **ZODS-RS** (CVPR 2026 Findings) — training-free fe
 
 Zuan Gu, Tianhan Gao, Langxu Zhao — Northeastern University, Shenyang, China
 
-[Project Page](https://gzaicebreak.github.io/zods-rs/) | Paper (arXiv coming soon)
+[Project Page](https://gzaicebreak.github.io/zods-rs/) | [arXiv:2606.10769](https://arxiv.org/abs/2606.10769)
 
 Given as few as one annotated reference image per category, ZODS-RS segments all instances of that category in unseen target images — without any training or fine-tuning.
 
@@ -118,13 +118,16 @@ tests/              # unit tests for SEM / PP / UAM
 
 ```bibtex
 @inproceedings{gu2026zodsrs,
-  title     = {{ZODS-RS}: Zero-training Oriented Detection and Segmentation for Remote Sensing},
-  author    = {Gu, Zuan and Gao, Tianhan and Zhao, Langxu},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision
-               and Pattern Recognition (CVPR) Findings},
-  year      = {2026},
-  address   = {Nashville, TN, USA},
-  note      = {To appear}
+  title         = {{ZODS-RS}: Zero-training Oriented Detection and Segmentation for Remote Sensing},
+  author        = {Gu, Zuan and Gao, Tianhan and Zhao, Langxu},
+  booktitle     = {Proceedings of the IEEE/CVF Conference on Computer Vision
+                   and Pattern Recognition (CVPR) Findings},
+  year          = {2026},
+  address       = {Nashville, TN, USA},
+  eprint        = {2606.10769},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  note          = {To appear}
 }
 ```
 
