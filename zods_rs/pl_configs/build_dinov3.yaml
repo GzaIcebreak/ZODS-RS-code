@@ -1,0 +1,244 @@
+seed_everything: 42
+
+model:
+  class_path: zods_rs.pl_wrapper.sam2matcher_pl.Sam2MatcherLightningModel
+  init_args:
+    model_cfg:
+      name: "matching_baseline_noAMG"
+      sam2_cfg_file: "sam2_hiera_l.yaml"
+      sam2_ckpt_path: "./checkpoints/sam2_hiera_large.pt"
+      sam2_infer_cfgs:
+        points_per_side: 32
+        testing_point_bs: 256
+        iou_thr: 0.4
+        nms_thr: 0.5
+        num_out_instance: 100
+        kmeans_k: 4
+        n_pca_components: 3
+        cls_num_per_mask: 1
+      uam:
+        enable: false
+        temperature: 1
+        threshold: 0.3
+        calibrate: true
+        auto_tau:
+          enable: true
+          method: "entropy_target"
+          target_entropy: 0.9
+          percentile: 80.0
+          tau_range: [0.5, 2]
+          verbose: true
+        prior:
+          enable: true
+          combine: "logit"  # B1: logit/prob/weight 模式
+          gamma: 1.5        # B1: 先验强度系数
+          a: 0.5            # Norm 权重
+          b: 0.5            # Margin 权重  
+          c: 0.2            # Attention 权重
+          d: 0.0            # 偏置项
+          scale: "percentile"  # 归一化方式
+          p_low: 0.02       # 下百分位
+          p_high: 0.98      # 上百分位
+          # 空间先验（原有）
+          margin:
+            enable: true
+            width: 0.1
+            sharpen: 3
+          norm:
+            enable: false
+            sigma: 0.4
+          # 置信先验子配置（B1）
+          margin_prior:
+            k: 2
+            mode: "logit"
+          norm_prior:
+            mode: "l2"
+          attn_prior:
+            fallback: "grad"
+        # B2: 负原型配置
+        negproto:
+          enable: true      # 启用负原型竞争
+          num: 3            # 负原型数量
+          min_area: 128     # 最小面积阈值（像素）
+        crf:
+          enable: true
+          n_iters: 10
+          sxy: [3, 3]
+          srgb: [5, 5, 5]
+        memory:
+          sparsify: true
+          chunk: null
+          mixed_precision: false
+        # CWLA 不确定性融合配置（可选）
+        cwla:
+          fuse_uncert: true  # 是否融合多层U/E
+        debug:
+          save_probs: true
+          save_entropy: true
+          save_energy: true
+          save_masks: true
+          save_prior: true
+          out_dir: "./results_analysis/uam_debug"
+      sem:
+        enable: false
+        scales: [1, 1.5, 2]
+        alpha: 0.75
+        method: "greedy"
+        gamma: 0.2  # 尺度核带宽（用于R-SEM）
+        agg: "mean"  # R-SEM 聚合方式
+        dilate: 1   # R-SEM 膨胀半径（整数，像素数）
+        assignment: "hungarian"  # R-SEM 分配算法
+        cache_pyr: true
+        score_dtype: "fp32"
+        # A组：高级代价计算配置
+        cost:
+          mode: "topk_cover"    # A1: topk_cover / mean(旧方法)
+          topk_frac: 0.2        # A1: Top-k 比例（前 20%）
+          topk_min: 50          # A1: 最小像素数
+          cover_std_k: 1.0      # A1: 覆盖率阈值系数
+          cover_w: 0.2          # A1: 覆盖率权重
+          shape_w: 0.2        # A2/B4: 形状先验权重
+          angle_tol: 25.0       # A2/B3: 角度容差（度）
+          ratio_min: 2.0        # A2: 最小长宽比
+          ratio_max: 12.0       # A2: 最大长宽比
+          area_mult: 8.0        # A2: 面积倍数范围
+        # R-SEM (旋转等变匹配) 配置
+        rot:
+          enable: false  # 默认关闭，需要时通过 CLI 开启
+          angles: [-30, -15, 0, 15, 30]  # 旋转角度（度）
+          eta: 0.35      # 角度核带宽
+          mode: "bilinear"
+          padding_mode: "border"
+          align_corners: false
+        # CWLA (多层一致性聚合) 配置
+        cwla:
+          enable: true  # 默认关闭，需要时开启
+          layers: [8, 12, -1]  # 使用的DINOv3层
+          metric: "agreement"  # 一致性度量：entropy/margin/jsd/agreement
+          sigma: 0.15  # softmax温度（控制权重集中度）
+          tau_mode: "auto"  # 温度模式：auto/fixed
+          tau_strategy: "std"  # 自动温度策略
+          tau_k: 1.0
+          tau_p: 0.85
+          smooth: 0.2  # 权重平滑强度（0=不平滑）
+        # DINOv3 多层配置
+        dino:
+          use_multilayer: true
+          layers: [8, 10, -1]
+          use_attn_prior: true
+          gamma: 0.5
+          gamma_auto: true
+          cheap_scales: false
+        # 调试可视化
+        debug:
+          save_weights: true
+          save_heatmap: true
+          save_matches: true
+          save_alpha_beta: false  # R-SEM α/β 权重（若启用）
+          save_attn: false
+          out_dir: "./results_analysis/sem_debug"
+      eval:
+        out_format: "mask"
+        
+      encoder_cfg:
+        name: "dinov3_large"
+        # DINOv3 ViT-L/16 (distilled), local weights
+        hf_model_name: "./dinov3-vitl16-local"
+        local_safetensors: "./dinov3-vitl16-local/model.safetensors"
+      encoder_ckpt_path: ""
+      memory_bank_cfg:
+        enable: true
+        category_num: 1
+        length: 1
+        pp:
+          enable: true
+          top_r: 32  # 主成分数量
+          alpha: 0.7  # CLIP图像先验权重
+          beta: 0.5   # CLIP文本先验权重
+          use_whitening: false
+          use_subprototypes: true
+          # OT-PP (Sinkhorn跨模态对齐) 配置
+          ot:
+            enable: false  # 默认关闭，与robust互斥
+            mode: "prior"  # prior / barycentric
+            reg: 0.05  # 熵正则化参数
+            debias: true  # 使用Sinkhorn散度（去偏）
+            max_iters: 200
+            tol: 1.0e-6
+            stabilize: "log"  # log域稳定
+            a: "uniform"
+            b: "uniform"
+            sample_cap_n: 2000  # DINO侧子采样上限
+            sample_cap_m: 256   # CLIP侧子采样上限
+            kappa: 2.0  # prior模式softmax温度
+          # Robust-PP (Tyler's M-estimator) 配置
+          robust:
+            enable: true  # 默认关闭，与ot互斥
+            iters: 20
+            tol: 1.0e-4
+            init: "identity"  # identity / sample
+            eps: 1.0e-6
+            trace_norm: true
+            verbose: false
+          # 聚类配置
+          cluster:
+            method: "hdbscan"
+            min_size: 10
+            max_k: 4
+          # CLIP配置
+          clip:
+            enable: false
+            model: "ViT-B/16"
+            texts:
+              build: ["build"]
+          # 调试配置
+          debug:
+            enable: false
+            save_spectrum: true
+            save_heatmap: true
+            save_clusters: true
+            max_classes: 6
+            out_dir: "./results_analysis/pp_debug"
+
+        
+      dataset_name: "build"
+      dataset_imgs_path: "data/my_build/images" 
+      class_names: ["build"]
+      online_vis: true
+      vis_thr: 0.3
+
+    dataset_cfgs:
+      fill_memory:
+        name: "custom"
+        root: "data/my_build/images"
+        json_file: "data/my_build/annotations/custom_references_with_segm_sam21.json"
+        memory_pkl: "data/my_build/annotations/custom_references_with_segm.pkl"
+        image_size: 518
+        memory_length: 1
+        context_ratio: 0.2
+        norm_img: false
+        cat_names: "build"
+      test:
+        name: "custom"
+        root: "data/my_build/images"
+        json_file: "data/my_build/annotations/custom_targets.json"
+        image_size: 1024
+        norm_img: false
+        with_query_points: false
+        cat_names: ["build"]
+
+    data_load_cfgs:
+      workers: 0
+    test_mode: "fill_memory"
+
+trainer:
+  devices: 1
+  benchmark: true
+  precision: 32
+  logger:
+    - class_path: pytorch_lightning.loggers.CSVLogger
+      init_args:
+        save_dir: ./work_dirs/build
+
+# Output path for fill_memory stage
+out_path: ./tmp_ckpts/build/build_refs_memory.pth
