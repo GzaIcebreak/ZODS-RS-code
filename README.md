@@ -2,6 +2,8 @@
 
 Official implementation of **ZODS-RS** (CVPR 2026 Findings) — training-free few-shot instance segmentation for remote sensing imagery, built on SAM2 and DINOv3.
 
+Zuan Gu, Tianhan Gao, Langxu Zhao — Northeastern University, Shenyang, China
+
 [Project Page](https://gzaicebreak.github.io/zods-rs/) | Paper (arXiv coming soon)
 
 Given as few as one annotated reference image per category, ZODS-RS segments all instances of that category in unseen target images — without any training or fine-tuning.
