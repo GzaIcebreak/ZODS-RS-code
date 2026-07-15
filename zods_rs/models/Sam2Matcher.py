@@ -28,17 +28,6 @@ from zods_rs.utils import print_dict
 
 
 encoder_predefined_cfgs = {
-    # Defaults for DINOv2 Large as used originally
-    "dinov2_large": dict(
-        model_size="vit_large",
-        init_values=1e-5,
-        ffn_layer='mlp',
-        block_chunks=0,
-        qkv_bias=True,
-        proj_bias=True,
-        ffn_bias=True,
-        feat_dim=1024,
-    ),
     # Minimal defaults for DINOv3 Large via HF; feat_dim/patch/img_size inferred in factory when omitted
     "dinov3_large": dict(
         hf_model_name="facebook/dinov3-large"
@@ -481,7 +470,7 @@ class Sam2Matcher(nn.Module):
             )
             samples_list, label_list = self.matcher.rps.sample_points(points)
 
-            # NOTE: Masks are generated using DINOv2's input size (518, 518)
+            # NOTE: Masks are generated using the encoder's input size (e.g. 518x518)
             masks_class, ious_class = self.sam_amg.generate(
                 tar_img_np,
                 select_point_coords=samples_list,

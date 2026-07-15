@@ -79,18 +79,6 @@ def _ensure_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 encoder_predefined_cfgs = {
-    "dinov2_large": dict(
-        model_size="vit_large",
-        img_size=518,
-        patch_size=14,
-        init_values=1e-5,
-        ffn_layer='mlp',
-        block_chunks=0,
-        qkv_bias=True,
-        proj_bias=True,
-        ffn_bias=True,
-        feat_dim=1024,
-    ),
     "dinov3_large": dict(
         hf_model_name="facebook/dinov3-large"
     ),

@@ -29,7 +29,6 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install the package (SAM2 CUDA extension is optional)
 pip install -e .
-cd dinov2 && pip install -e . && cd ..
 ```
 
 ## Model Weights
@@ -109,7 +108,6 @@ zods_rs/            # main package (models, datasets, Lightning wrappers, config
 modules/            # core algorithm modules (SEM, PP, UAM)
 utils/              # priors, calibration, CLIP adapters
 sam2/, sam2_configs/  # SAM2 (Meta AI, Apache 2.0)
-dinov2/             # DINOv2/DINOv3 support code (Meta AI)
 scripts/            # data preparation, batch processing, visualization tools
 tests/              # unit tests for SEM / PP / UAM
 ```
@@ -133,4 +131,4 @@ tests/              # unit tests for SEM / PP / UAM
 
 ## License
 
-This project builds on SAM2 (Apache 2.0) and DINOv2/DINOv3 (Meta AI licenses). See the respective subdirectories for details.
+This project builds on SAM2 (Apache 2.0) and DINOv3 (Meta AI license). See the respective subdirectories for details.

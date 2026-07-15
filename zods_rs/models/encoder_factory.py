@@ -8,7 +8,7 @@ from torchvision.transforms import Normalize
 
 class EncoderWrapper:
     """
-    A thin adapter over different visual backbones (DINOv2, DINOv3) that exposes
+    A thin adapter over the DINOv3 backbone that exposes
     a unified token extraction interface.
     """
 
@@ -27,7 +27,7 @@ class EncoderWrapper:
         self.img_size = img_size
         self.patch_size = patch_size
         self.feat_dim = feat_dim
-        self.family = family  # "dinov2" | "dinov3"
+        self.family = family  # "dinov3"
         self.aux = aux or {}
 
     @torch.no_grad()
@@ -41,11 +41,6 @@ class EncoderWrapper:
         """
         if normalize:
             imgs = self.transform(imgs)
-
-        if self.family == "dinov2":
-            # Keep behavior consistent with original usage: x_prenorm and drop CLS
-            feats = self.model.forward_features(imgs)["x_prenorm"][:, 1:]
-            return feats.reshape(imgs.shape[0], -1, self.feat_dim)
 
         if self.family == "dinov3":
             outputs = self.model(pixel_values=imgs)
@@ -81,42 +76,6 @@ class EncoderWrapper:
         if normalize:
             imgs = self.transform(imgs)
         
-        if self.family == "dinov2":
-            x = self.model.prepare_tokens_with_masks(imgs)
-            n_skip = 1 + self.model.num_register_tokens
-            
-            layer_feats = []
-            attn = None
-            
-            for i, blk in enumerate(self.model.blocks):
-                x, _attn = blk(x, ret_attn=True) if return_attn else (blk(x), None)
-                
-                if return_attn and _attn is not None:
-                    _attn = _attn.mean(dim=1)
-                    if attn is None:
-                        attn = _attn
-                    else:
-                        n = _attn.shape[1]
-                        eye = torch.eye(n, device=imgs.device)
-                        attn = (eye + _attn) @ (eye + attn)
-                
-                # Collect specified layers
-                if i in layers or (i - len(self.model.blocks)) in layers:
-                    x_norm = self.model.norm(x) if i == len(self.model.blocks) - 1 else x
-                    feats = x_norm[:, n_skip:].reshape(imgs.shape[0], -1, self.feat_dim)
-                    layer_feats.append(feats)
-            
-            # Final norm if last layer not already collected
-            if -1 in layers and (len(self.model.blocks) - 1) not in layers:
-                x = self.model.norm(x)
-                feats = x[:, n_skip:].reshape(imgs.shape[0], -1, self.feat_dim)
-                layer_feats.append(feats)
-            
-            if return_attn and attn is not None:
-                attn = attn[:, n_skip:, n_skip:]
-            
-            return layer_feats, attn
-        
         if self.family == "dinov3":
             # DINOv3 via transformers - extract intermediate outputs
             outputs = self.model(pixel_values=imgs, output_hidden_states=True)
@@ -146,31 +105,6 @@ class EncoderWrapper:
         Returns tokens and (optionally) rolled attention map if available.
         For DINOv3 we return (tokens, None).
         """
-        if self.family == "dinov2":
-            if normalize:
-                imgs = self.transform(imgs)
-
-            # Replicate the logic used in Sam2MatchingBaseline_noAMG._forward_encoder_attn_roll
-            x = self.model.prepare_tokens_with_masks(imgs)
-            n_skip_tokens = 1 + self.model.num_register_tokens
-            attn = None
-            for i, blk in enumerate(self.model.blocks):
-                x, _attn = blk(x, ret_attn=True)
-                # average heads
-                _attn = _attn.mean(dim=1)
-                # roll
-                if attn is None:
-                    attn = _attn
-                else:
-                    n = _attn.shape[1]
-                    eye = torch.eye(n, device=imgs.device)
-                    attn = (eye + _attn) @ (eye + attn)
-            x = self.model.norm(x)
-            attn = attn[:, n_skip_tokens:, n_skip_tokens:]
-            feats = x[:, n_skip_tokens:]
-            feats = feats.reshape(imgs.shape[0], -1, self.feat_dim)
-            return feats, attn
-
         if self.family == "dinov3":
             tokens = self.tokens_from_images(imgs, normalize=normalize)
             return tokens, None
@@ -181,7 +115,6 @@ class EncoderWrapper:
 def build_encoder(encoder_cfg: dict, encoder_ckpt_path: Optional[str]) -> EncoderWrapper:
     """
     Build an EncoderWrapper from config. Supports:
-      - name: "dinov2_large" (existing behavior)
       - name: "dinov3_large" (Hugging Face transformers)
     Additional fields (optional for dinov3):
       - hf_model_name: e.g. "facebook/dinov3-large"
@@ -189,21 +122,6 @@ def build_encoder(encoder_cfg: dict, encoder_ckpt_path: Optional[str]) -> Encode
     name = copy.deepcopy(encoder_cfg).pop("name")
     img_size = encoder_cfg.get("img_size")
     patch_size = encoder_cfg.get("patch_size")
-
-    if name.startswith("dinov2"):
-        import dinov2.dinov2.models.vision_transformer as dinov2_vit
-        import dinov2.dinov2.utils.utils as dinov2_utils
-
-        # Defaults from predefined configs in callers
-        encoder_args = copy.deepcopy(encoder_cfg)
-        model_size = encoder_args.pop("model_size")
-        feat_dim = encoder_args.pop("feat_dim")
-
-        model = dinov2_vit.__dict__[model_size](**encoder_args)
-        assert encoder_ckpt_path is not None and len(encoder_ckpt_path) > 0, "Missing DINOv2 checkpoint path"
-        dinov2_utils.load_pretrained_weights(model, encoder_ckpt_path, "teacher")
-        transform = Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-        return EncoderWrapper(model, transform, img_size, patch_size, feat_dim, family="dinov2")
 
     if name.startswith("dinov3"):
         try:
